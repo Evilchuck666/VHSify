@@ -51,10 +51,18 @@ jobs:
         if: runner.os == 'Linux'
         timeout-minutes: 10
         run: |
-          # Fail fast and retry when a mirror stalls instead of hanging the job.
-          apt_opts=(-o Acquire::Retries=5 -o Acquire::http::Timeout=30)
-          sudo apt-get "${apt_opts[@]}" update
-          sudo apt-get "${apt_opts[@]}" install --no-install-recommends -y ffmpeg sox jq shellcheck
+          # The runner's Azure mirror sometimes stalls mid-download. Cap each
+          # attempt and fall back to the main Ubuntu archive before retrying.
+          apt_opts=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30)
+          for attempt in 1 2 3; do
+            if timeout 150 sudo apt-get "${apt_opts[@]}" update &&
+               timeout 240 sudo apt-get "${apt_opts[@]}" install --no-install-recommends -y ffmpeg sox jq shellcheck; then
+              exit 0
+            fi
+            echo "::warning::apt attempt $attempt failed, switching to archive.ubuntu.com and retrying."
+            sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/sources.list.d/*.sources /etc/apt/sources.list 2>/dev/null || true
+          done
+          exit 1
 
       - name: Install FFmpeg and SoX (macOS)
         if: runner.os == 'macOS'
