@@ -1,7 +1,10 @@
 # 📼 VHSify
 
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20GNU%2FLinux%20%7C%20macOS-blue)
+![Requires](https://img.shields.io/badge/requires-FFmpeg%2C%20SoX-blue)
+[![License](https://img.shields.io/badge/license-GPLv3-green)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/Evilchuck666/VHSify?label=download&sort=semver)](https://github.com/Evilchuck666/VHSify/releases/latest)
-[![Test and release](https://github.com/Evilchuck666/VHSify/actions/workflows/release.yml/badge.svg)](https://github.com/Evilchuck666/VHSify/actions/workflows/release.yml)
+[![Build and tests](https://github.com/Evilchuck666/VHSify/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/Evilchuck666/VHSify/actions/workflows/release.yml)
 
 **Turn any video into a worn-out VHS tape**: chroma bleed, soft luma, film grain, tracking jitter and tape hiss. It's a small script that runs **FFmpeg** for the picture and **SoX** for the sound, then muxes both into a lossless AVI (UTVideo + PCM float) that you can transcode however you like.
 
@@ -273,4 +276,4 @@ The workflow tests everything, packages `VHSify-linux.tar.gz`, `VHSify-macos.tar
 ---
 
 ## 📜 License
-**MIT License**: feel free to use, modify, and distribute. See [LICENSE](LICENSE).
+Released under the **GNU General Public License v3.0**. See [LICENSE](LICENSE).
