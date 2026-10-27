@@ -1,90 +1,148 @@
-# VHS FX (PowerShell) — README
+# 📼 VHSify
 
-Applies a **VHS look** to both video and audio using **FFmpeg** and **SoX**, then muxes the result into an AVI container (UTVideo + PCM).
+**Turn any video into a worn-out VHS tape**: chroma bleed, soft luma, film grain, tracking jitter and tape hiss. It's a small script that runs **FFmpeg** for the picture and **SoX** for the sound, then muxes both into a lossless AVI (UTVideo + PCM float) that you can transcode however you like.
 
-> **Strongly recommended:** Run this script with **PowerShell 7 (pwsh)** inside **Windows Terminal**. Windows PowerShell 5.x may show Unicode/emoji glitches and has poorer cross‑platform behavior. PS7 + Windows Terminal avoids those issues.
+Runs on **GNU/Linux**, **macOS** and **Windows**.
+
+| Platform | Script | Shell |
+|---|---|---|
+| 🐧 GNU/Linux | `vhsify.sh` | bash 3.2+ |
+| 🍎 macOS (Intel & Apple Silicon) | `vhsify.sh` | bash 3.2+ (the stock `/bin/bash` works) |
+| 🪟 Windows 10/11 | `vhsify.ps1` | PowerShell 7+ (recommended) or Windows PowerShell 5.1 |
 
 ---
 
 ## ✨ Features
 - VHS‑style **video**: YUV plane separation, heavy down/upscales for chroma bleed, desaturation, grain, and subtle horizontal jitter.
 - VHS‑style **audio**: original audio mixed with **brown noise** and a **4 kHz low‑pass** to mimic tape bandwidth.
-- Lossless intermediate: **UTVideo** (video) + **PCM float** (audio) → easy to transcode later.
-- **Single file** mode or **batch** mode via JSON list.
-- Automatic cleanup of temporary files.
+- Lossless intermediate: **UTVideo** (video) + **PCM float** (audio), easy to transcode later.
+- **Single file**, **several files**, or **batch** mode via a JSON (or plain text) list.
+- Works with any audio layout (mono, 5.1, 44.1 kHz…), and with **silent videos** too: they get the tape hiss alone.
+- Never overwrites your source: output goes next to it as `<name>_vhs.avi` (or to `--output-dir`).
+- Temporary files live in a private temp folder that is always cleaned up.
 
 ---
 
 ## 📦 Requirements
-- **Windows 10/11**
-- **PowerShell 7+** (pwsh) — *strongly recommended*, especially because the script prints emojis.
-- **Windows Terminal** — recommended for proper Unicode rendering.
 - **FFmpeg** (includes `ffprobe`) in your `PATH`.
 - **SoX** in your `PATH`.
+- Optional, Linux/macOS: **jq** or **python3** to read JSON lists (plain text lists need nothing).
 
-Verify installations:
-```powershell
+| Platform | Install |
+|---|---|
+| Debian / Ubuntu | `sudo apt install ffmpeg sox jq` |
+| Fedora | `sudo dnf install ffmpeg sox jq` (FFmpeg from RPM Fusion) |
+| Arch Linux | `sudo pacman -S ffmpeg sox jq` |
+| macOS ([Homebrew](https://brew.sh)) | `brew install ffmpeg sox jq` |
+| Windows ([winget](https://learn.microsoft.com/windows/package-manager/)) | `winget install Gyan.FFmpeg ChrisBagwell.SoX` |
+| Windows ([Chocolatey](https://chocolatey.org)) | `choco install ffmpeg sox.portable` |
+
+Check them:
+```sh
 ffmpeg -version
 ffprobe -version
 sox --version
-$PSVersionTable.PSVersion
 ```
+
+> **Windows:** use **PowerShell 7 (pwsh)** inside **Windows Terminal** for the best experience. Windows PowerShell 5.1 works too.
 
 ---
 
-## 🗂️ Set your working folder
-The script uses several paths with the placeholder `<<YOUR_VIDEOS_FOLDER>>`. Replace it with an existing folder for temps and outputs, e.g.:
+## ⬇️ Install
 
-```powershell
-$global:vhsFile   = "C:\Videos\work\vhs.avi"
-$global:wavFile   = "C:\Videos\work\audio.wav"
-$global:wavFxFile = "C:\Videos\work\vhs.wav"
-$global:noise     = "C:\Videos\work\noise.wav"
-$global:mix       = "C:\Videos\work\mix.wav"
+Grab the package for your system from the [latest release](../../releases/latest):
+
+| Package | Contents |
+|---|---|
+| `VHSify-linux.tar.gz` | `vhsify.sh`, README, LICENSE |
+| `VHSify-macos.tar.gz` | `vhsify.sh`, README, LICENSE |
+| `VHSify-windows.zip` | `vhsify.ps1`, README, LICENSE |
+| `SHA256SUMS.txt` | Checksums of the packages above |
+
+**GNU/Linux / macOS:**
+```sh
+tar -xzf VHSify-linux.tar.gz          # or VHSify-macos.tar.gz
+cd VHSify-linux
+./vhsify.sh --help
+
+# Optional: make it available everywhere
+sudo install -m 755 vhsify.sh /usr/local/bin/vhsify
 ```
 
-The **final output** defaults to: `<<YOUR_VIDEOS_FOLDER>>\<basename>.avi`.
+> **macOS:** if Gatekeeper complains about a downloaded file, run `xattr -d com.apple.quarantine vhsify.sh`.
 
-> JSON on Windows uses doubled backslashes: `C\\Videos\\clip.mp4`.
+**Windows:** extract the zip, open PowerShell in that folder and run `.\vhsify.ps1`. If scripts are blocked, run `Unblock-File .\vhsify.ps1` or allow local scripts with `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+
+Or just clone the repository and run the script from it.
 
 ---
 
 ## 🚀 Quick start
 
-### 1) Single file
-```powershell
-# In PowerShell 7 (pwsh)
-.\vhs.ps1 -InputPath "C:\Videos\clip.mp4"
-```
-If you omit `-InputPath`, the script will prompt for it (drag‑and‑drop also works in some shells).
+### GNU/Linux & macOS
+```sh
+# One or more files
+./vhsify.sh ~/Videos/clip.mp4
+./vhsify.sh clip1.mp4 clip2.mkv
 
-### 2) Batch mode (JSON list)
-Create a JSON file with an **array of absolute paths**:
+# Choose where results go
+./vhsify.sh -o ~/Videos/vhs clip.mp4
+
+# Batch: JSON array or plain text (one path per line, # for comments)
+./vhsify.sh --list list.json
+
+# No arguments: you'll be asked for a path (drag & drop the file onto the terminal)
+./vhsify.sh
+```
+
+| Option | Description |
+|---|---|
+| `-l, --list FILE` | Process every video in FILE: a JSON array of paths or a plain text file with one path per line. |
+| `-o, --output-dir DIR` | Write results to DIR (created if needed). Default: next to each input. |
+| `-s, --suffix TEXT` | Suffix for the output name. Default: `_vhs`. |
+| `-h, --help` | Show help. |
+| `-V, --version` | Show the version. |
+
+### Windows (PowerShell)
+```powershell
+# One or more files
+.\vhsify.ps1 -InputPath "C:\Videos\clip.mp4"
+.\vhsify.ps1 -InputPath "C:\Videos\a.mp4", "C:\Videos\b.mkv"
+
+# Choose where results go
+.\vhsify.ps1 -InputPath "C:\Videos\clip.mp4" -OutputDir "D:\VHS"
+
+# Batch: JSON list
+.\vhsify.ps1 -JsonPath "C:\Videos\list.json"
+
+# No arguments: you'll be asked for a path (drag & drop works)
+.\vhsify.ps1
+```
+
+| Parameter | Description |
+|---|---|
+| `-InputPath <string[]>` | One or more input videos. |
+| `-JsonPath <string>` | JSON file with an array of video paths. |
+| `-OutputDir <string>` | Write results there (created if needed). Default: next to each input. |
+| `-Suffix <string>` | Suffix for the output name. Default: `_vhs`. |
+| `-Version` | Show the version. |
+
+### JSON list format
+An **array of paths**. Relative paths are resolved from the current folder.
 ```json
 [
-  "C\\Videos\\clip1.mp4",
-  "D\\Captures\\session.mkv"
+  "/home/me/Videos/clip1.mp4",
+  "/Users/me/Movies/session.mkv",
+  "C:\\Videos\\clip2.mp4"
 ]
 ```
-Run:
-```powershell
-.\vhs.ps1 -JsonPath "C:\Videos\list.json"
-```
-The script will iterate the list and process each video.
-
----
-
-## ⚙️ Parameters
-- `-InputPath <string>`: path to a single input video.
-- `-JsonPath  <string>`: path to a JSON file containing a list of video paths.
-
-If both are omitted, you’ll be prompted for a path.
+> JSON on Windows uses doubled backslashes: `C:\\Videos\\clip.mp4`.
 
 ---
 
 ## 🧪 Processing pipeline
 
-### Step 0 — **VHS FX (video)**
+### Step 0: **VHS FX (video)**
 `ffmpeg -filter_complex` pipeline:
 - Split into **Y/U/V** with `extractplanes`.
 - Luma (Y) down/up: `scale=768:1080` → `scale=1920:1080`.
@@ -92,31 +150,29 @@ If both are omitted, you’ll be prompted for a path.
 - Recombine to **yuv420p** via `mergeplanes`.
 - Tone & texture: `eq=saturation=0.75`, `noise=alls=5`, and a mild **horizontal jitter** in luma with `geq` + `random()`.
 
-**Outputs:**
-- `vhs.avi` (video only, **UTVideo**, tagged as `bt709`)
-- `audio.wav` (PCM extracted from the source)
+The output is always **1920×1080**, whatever the source resolution.
 
-### Step 1 — **VHS FX (audio)**
+**Outputs:** `vhs.avi` (video only, **UTVideo**, tagged as `bt709`) and `audio.wav` (source audio as 48 kHz stereo PCM float).
+
+### Step 1: **VHS FX (audio)**
 Using **SoX**:
-1) Synthesize **brown noise** for the full duration (queried via `ffprobe`). 48 kHz / 32‑bit float / stereo.
-2) Mix original audio + noise with gains `inVol` and `outVol`.
-3) Apply **low‑pass** at **4 kHz**.
+1. Synthesize **brown noise** for the full duration (queried via `ffprobe`). 48 kHz / 32‑bit float / stereo.
+2. Mix original audio + noise with gains `inVol` and `outVol` (noise only if the video is silent).
+3. Apply a **low‑pass** at **4 kHz**.
 
 **Output:** `vhs.wav`.
 
-### Step 2 — **Final mux**
-Combine `vhs.avi` (video) + `vhs.wav` (audio) without re‑encoding (`-c copy`) to:
-```
-<<YOUR_VIDEOS_FOLDER>>\<basename>.avi
-```
-> The `<basename>` is sanitized: illegal characters `:*?"<>|` become `-`.
+### Step 2: **Final mux**
+Combine `vhs.avi` (video) + `vhs.wav` (audio) without re‑encoding (`-c copy`) into `<name>_vhs.avi`.
 
-### Step 3 — **Cleanup**
-Delete temporaries: `noise.wav`, `mix.wav`, `vhs.avi`, `vhs.wav`, `audio.wav`.
+### Step 3: **Cleanup**
+Temporaries (`noise.wav`, `mix.wav`, `vhs.avi`, `vhs.wav`, `audio.wav`) are deleted, and the temp folder is removed even if something fails.
 
 ---
 
 ## 🔧 Default constants
+
+Defined at the top of both scripts (`UPPER_CASE` in `vhsify.sh`, `$global:camelCase` in `vhsify.ps1`).
 
 | Variable          | Default     | Notes                                  |
 |-------------------|-------------|----------------------------------------|
@@ -133,55 +189,52 @@ Delete temporaries: `noise.wav`, `mix.wav`, `vhs.avi`, `vhs.wav`, `audio.wav`.
 | `pixFmt`          | `yuv420p`   | Pixel format                           |
 | `vidColorspace`   | `bt709`     | Colorimetry signaled on output         |
 
-> You can fine‑tune the FFmpeg filter in `$global:ffmpegFilter` (saturation, noise amount, jitter magnitude, etc.).
+> Fine‑tune the look in `FFMPEG_FILTER` / `$global:ffmpegFilter` (saturation, noise amount, jitter magnitude, etc.).
 
 ---
 
 ## 🧰 Post‑processing (optional)
-Lossless intermediates are **large**. Transcode after inspection:
+Lossless intermediates are **large** (easily several GB per minute of 1080p). Transcode after inspection:
 
 **To H.264 (high quality):**
-```powershell
-ffmpeg -i "final.avi" -c:v libx264 -crf 16 -preset slow -c:a aac -b:a 192k "final_h264.mp4"
+```sh
+ffmpeg -i "clip_vhs.avi" -c:v libx264 -crf 16 -preset slow -c:a aac -b:a 192k "clip_vhs.mp4"
 ```
 **To H.265/HEVC:**
-```powershell
-ffmpeg -i "final.avi" -c:v libx265 -crf 20 -preset slow -c:a aac -b:a 192k "final_hevc.mp4"
+```sh
+ffmpeg -i "clip_vhs.avi" -c:v libx265 -crf 20 -preset slow -tag:v hvc1 -c:a aac -b:a 192k "clip_vhs_hevc.mp4"
 ```
 **Remux to MKV (no re‑encode):**
-```powershell
-ffmpeg -i "final.avi" -c copy "final.mkv"
+```sh
+ffmpeg -i "clip_vhs.avi" -c copy "clip_vhs.mkv"
 ```
+
+> **macOS:** QuickTime can't play UTVideo AVI files. Use [IINA](https://iina.io) or [VLC](https://www.videolan.org), or transcode to H.264/HEVC as shown above.
 
 ---
 
 ## 🧯 Troubleshooting
-- **`ffprobe` returns `N/A`** → Source file or container is problematic. Try: `ffmpeg -i input -c copy fixed.mkv`, then re‑run the script.
-- **`ffmpeg`/`sox` not recognized** → Add to `PATH` or call with absolute paths.
-- **Paths with spaces** → Always wrap in quotes: `"C:\My Videos\clip.mp4"`.
-- **Emoji/Unicode look broken** → Use **PowerShell 7** in **Windows Terminal**.
-- **Colorimetry looks off in some players** → Remux to MKV: `ffmpeg -i final.avi -c copy final.mkv`.
+- **`ffprobe` returns `N/A`** → the source file or container is problematic. Try `ffmpeg -i input -c copy fixed.mkv`, then run the script again.
+- **`ffmpeg`/`sox` not found** → install them (see [Requirements](#-requirements)) and make sure they're in your `PATH`.
+- **Paths with spaces** → always wrap them in quotes: `"My Videos/clip.mp4"`.
+- **`Permission denied` on Linux/macOS** → `chmod +x vhsify.sh`, or run it as `bash vhsify.sh`.
+- **"running scripts is disabled" on Windows** → `Unblock-File .\vhsify.ps1` or `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+- **Emoji/Unicode look broken on Windows** → use **PowerShell 7** in **Windows Terminal**.
+- **`The "mapping" option is deprecated` warning** → harmless on recent FFmpeg; the old syntax is kept so the script also works with older FFmpeg versions.
+- **Colorimetry looks off in some players** → remux to MKV: `ffmpeg -i clip_vhs.avi -c copy clip_vhs.mkv`.
 
 ---
 
-## 🧭 Files produced (temps & output)
-```
-<<YOUR_VIDEOS_FOLDER>>\
-├─ vhs.avi       # Video w/ VHS look (UTVideo, video‑only)
-├─ audio.wav     # Original audio (extracted)
-├─ noise.wav     # Brown noise (synthesized)
-├─ mix.wav       # Mixed original+noise
-├─ vhs.wav       # Final audio after low‑pass
-└─ <basename>.avi  # FINAL FILE (streams copied)
-```
-Temporaries are deleted at the end of the run.
+## 🏗️ Releases (for maintainers)
+The [Test and release](.github/workflows/release.yml) workflow runs both scripts on generated clips on **Ubuntu**, **macOS** (including the stock bash 3.2) and **Windows** (PowerShell 7 and 5.1) on every push and pull request.
+
+To publish a release:
+1. Bump `VERSION` in `vhsify.sh` and `$script:VhsifyVersion` in `vhsify.ps1`, then push to `main`.
+2. Go to **Actions → Test and release → Run workflow** and enter the version (e.g. `1.0.1`, without the `v`).
+
+The workflow tests everything, packages `VHSify-linux.tar.gz`, `VHSify-macos.tar.gz` and `VHSify-windows.zip`, generates `SHA256SUMS.txt`, and creates the `vX.Y.Z` tag and GitHub release with auto‑generated notes.
 
 ---
 
 ## 📜 License
-**MIT License** — feel free to use, modify, and distribute.
-
----
-
-## 🙌 Notes & ideas
-- Prefer **PS7 + Windows Terminal** for the best experience.
+**MIT License**: feel free to use, modify, and distribute. See [LICENSE](LICENSE).

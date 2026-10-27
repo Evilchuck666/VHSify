@@ -1,0 +1,207 @@
+name: Test and release
+
+# Pushes and pull requests run the scripts against a generated test clip on
+# GNU/Linux, macOS and Windows. "Run workflow" does the same; give it a version
+# (e.g. 1.0.0, matching VERSION in vhsify.sh and vhsify.ps1) to also publish a
+# GitHub release with the three packages.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'vhsify.sh'
+      - 'vhsify.ps1'
+      - 'README.md'
+      - 'LICENSE'
+      - '.github/workflows/release.yml'
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, without the v (e.g. 1.0.0). Leave empty to only test.'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Install FFmpeg and SoX (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ffmpeg sox jq shellcheck
+
+      - name: Install FFmpeg and SoX (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg sox
+
+      - name: Install FFmpeg and SoX (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install ffmpeg sox.portable -y --no-progress
+
+      - name: Lint
+        if: runner.os == 'Linux'
+        run: shellcheck vhsify.sh
+
+      - name: Generate test clips
+        run: |
+          set -euo pipefail
+          mkdir -p "work/in dir"
+          # Mono 44.1 kHz audio on purpose: the scripts must resample it for SoX.
+          ffmpeg -v error -y \
+            -f lavfi -i testsrc2=size=640x360:rate=25:duration=2 \
+            -f lavfi -i sine=frequency=440:sample_rate=44100:duration=2 \
+            -ac 1 -c:v mpeg4 -c:a aac "work/in dir/clip one.mp4"
+          ffmpeg -v error -y \
+            -f lavfi -i testsrc2=size=320x240:rate=30:duration=1 \
+            -c:v mpeg4 "work/in dir/silent.mp4"
+
+      - name: Run vhsify.sh (single file, default bash)
+        if: runner.os != 'Windows'
+        run: ./vhsify.sh "work/in dir/clip one.mp4"
+
+      - name: Run vhsify.sh (JSON list, system /bin/bash)
+        if: runner.os != 'Windows'
+        run: |
+          set -euo pipefail
+          /bin/bash --version | head -n 1
+          printf '[\n  "%s",\n  "%s"\n]\n' "$PWD/work/in dir/clip one.mp4" "$PWD/work/in dir/silent.mp4" > work/list.json
+          /bin/bash ./vhsify.sh --list work/list.json --output-dir work/out
+
+      - name: Run vhsify.ps1 (single file, PowerShell 7)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./vhsify.ps1 -InputPath "work/in dir/clip one.mp4"
+
+      - name: Run vhsify.ps1 (JSON list, Windows PowerShell 5.1)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $list = @(
+            (Resolve-Path "work/in dir/clip one.mp4").Path,
+            (Resolve-Path "work/in dir/silent.mp4").Path
+          )
+          ConvertTo-Json -InputObject $list | Set-Content -Encoding UTF8 work/list.json
+          ./vhsify.ps1 -JsonPath work/list.json -OutputDir work/out
+
+      - name: Verify outputs
+        run: |
+          set -euo pipefail
+          for file in "work/in dir/clip one_vhs.avi" "work/out/clip one_vhs.avi" "work/out/silent_vhs.avi"; do
+            [[ -s "$file" ]] || { echo "::error::Missing output $file"; exit 1; }
+            streams=$(ffprobe -v error -show_entries stream=codec_name,width,height,sample_rate,channels -of csv=p=0 "$file" | tr -d '\r' | sed 's/,*$//')
+            echo "$file -> $(echo "$streams" | paste -sd ' ' -)"
+            grep -qx 'utvideo,1920,1080' <<< "$streams" || { echo "::error::$file has no 1080p UTVideo stream."; exit 1; }
+            grep -qx 'pcm_f32le,48000,2' <<< "$streams" || { echo "::error::$file has no 48 kHz stereo PCM stream."; exit 1; }
+          done
+
+  release:
+    name: Publish release
+    needs: test
+    if: github.event_name == 'workflow_dispatch' && inputs.version != '' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: vhsify-release
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ inputs.version }}
+      RELEASE_SHA: ${{ github.sha }}
+      PACKAGES: >-
+        VHSify-linux.tar.gz
+        VHSify-macos.tar.gz
+        VHSify-windows.zip
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Validate version and check tag
+        run: |
+          set -euo pipefail
+
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Use a version like 1.0.0, without the v."
+            exit 1
+          fi
+
+          sh_version=$(sed -nE 's/^VERSION="([^"]+)"/\1/p' vhsify.sh)
+          ps_version=$(sed -nE 's/^\$script:VhsifyVersion = "([^"]+)"/\1/p' vhsify.ps1)
+          if [[ "$sh_version" != "$VERSION" || "$ps_version" != "$VERSION" ]]; then
+            echo "::error::vhsify.sh says $sh_version and vhsify.ps1 says $ps_version. Bump both to $VERSION first."
+            exit 1
+          fi
+
+          # An API failure must stop the release, so no "|| true" here.
+          gh api --paginate "repos/$GH_REPO/git/matching-refs/tags/" --jq '.[].ref' > tags.txt
+          if grep -Fxq "refs/tags/v$VERSION" tags.txt; then
+            echo "::error::Tag v$VERSION already exists. Use another version."
+            exit 1
+          fi
+
+      - name: Build packages
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+
+          for platform in linux macos; do
+            dir="stage/VHSify-$platform"
+            mkdir -p "$dir"
+            install -m 755 vhsify.sh "$dir/vhsify.sh"
+            install -m 644 README.md LICENSE "$dir/"
+            tar -C stage -czf "release-assets/VHSify-$platform.tar.gz" "VHSify-$platform"
+          done
+
+          dir="stage/VHSify-windows"
+          mkdir -p "$dir"
+          cp vhsify.ps1 README.md LICENSE "$dir/"
+          (cd stage && zip -qr "../release-assets/VHSify-windows.zip" VHSify-windows)
+
+      - name: Check packages and generate checksums
+        working-directory: release-assets
+        run: |
+          set -euo pipefail
+          for file in $PACKAGES; do
+            if [[ ! -s "$file" ]]; then
+              echo "::error::Package $file is missing or empty."
+              exit 1
+            fi
+          done
+          sha256sum $PACKAGES > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Create tag and publish release
+        working-directory: release-assets
+        run: |
+          set -euo pipefail
+          gh release create "v$VERSION" $PACKAGES SHA256SUMS.txt \
+            --target "$RELEASE_SHA" \
+            --title "VHSify v$VERSION" \
+            --generate-notes \
+            --latest
