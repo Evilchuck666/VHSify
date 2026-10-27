@@ -49,9 +49,12 @@ jobs:
 
       - name: Install FFmpeg and SoX (Linux)
         if: runner.os == 'Linux'
+        timeout-minutes: 10
         run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y ffmpeg sox jq shellcheck
+          # Fail fast and retry when a mirror stalls instead of hanging the job.
+          apt_opts=(-o Acquire::Retries=5 -o Acquire::http::Timeout=30)
+          sudo apt-get "${apt_opts[@]}" update
+          sudo apt-get "${apt_opts[@]}" install --no-install-recommends -y ffmpeg sox jq shellcheck
 
       - name: Install FFmpeg and SoX (macOS)
         if: runner.os == 'macOS'
