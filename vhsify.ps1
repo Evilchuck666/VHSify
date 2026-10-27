@@ -16,7 +16,7 @@ param (
     [switch]$Version
 )
 
-$script:VhsifyVersion = "1.0.0"
+$script:VhsifyVersion = "1.1.0"
 
 
 # === Global Constants === #
