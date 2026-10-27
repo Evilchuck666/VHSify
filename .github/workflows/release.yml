@@ -71,7 +71,23 @@ jobs:
       - name: Install FFmpeg and SoX (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: choco install ffmpeg sox.portable -y --no-progress
+        timeout-minutes: 10
+        run: |
+          # The Chocolatey feed sometimes answers 504 and choco still exits 0
+          # with a package missing, so check the tools instead of the exit code.
+          $tools = 'ffmpeg', 'ffprobe', 'sox'
+          foreach ($attempt in 1..4) {
+            choco install ffmpeg sox.portable -y --no-progress
+            $missing = $tools | Where-Object { -not (Get-Command $_ -ErrorAction SilentlyContinue) }
+            if (-not $missing) {
+              $tools | ForEach-Object { (Get-Command $_).Source }
+              exit 0
+            }
+            Write-Host "::warning::Attempt ${attempt}: missing $($missing -join ', '). Retrying in $(15 * $attempt)s."
+            Start-Sleep -Seconds (15 * $attempt)
+          }
+          Write-Host "::error::Could not install $($missing -join ', ') from Chocolatey."
+          exit 1
 
       - name: Lint
         if: runner.os == 'Linux'
