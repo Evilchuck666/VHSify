@@ -1,5 +1,8 @@
 # 📼 VHSify
 
+[![Latest release](https://img.shields.io/github/v/release/Evilchuck666/VHSify?label=download&sort=semver)](https://github.com/Evilchuck666/VHSify/releases/latest)
+[![Test and release](https://github.com/Evilchuck666/VHSify/actions/workflows/release.yml/badge.svg)](https://github.com/Evilchuck666/VHSify/actions/workflows/release.yml)
+
 **Turn any video into a worn-out VHS tape**: chroma bleed, soft luma, film grain, tracking jitter and tape hiss. It's a small script that runs **FFmpeg** for the picture and **SoX** for the sound, then muxes both into a lossless AVI (UTVideo + PCM float) that you can transcode however you like.
 
 Runs on **GNU/Linux**, **macOS** and **Windows**.
@@ -50,30 +53,63 @@ sox --version
 
 ## ⬇️ Install
 
-Grab the package for your system from the [latest release](../../releases/latest):
+Download the latest version for your platform:
 
-| Package | Contents |
-|---|---|
-| `VHSify-linux.tar.gz` | `vhsify.sh`, README, LICENSE |
-| `VHSify-macos.tar.gz` | `vhsify.sh`, README, LICENSE |
-| `VHSify-windows.zip` | `vhsify.ps1`, README, LICENSE |
-| `SHA256SUMS.txt` | Checksums of the packages above |
+| Platform | Download | Contents |
+|---|---|---|
+| 🐧 GNU/Linux | [**VHSify-linux.tar.gz**](https://github.com/Evilchuck666/VHSify/releases/latest/download/VHSify-linux.tar.gz) | `vhsify.sh`, README, LICENSE |
+| 🍎 macOS | [**VHSify-macos.tar.gz**](https://github.com/Evilchuck666/VHSify/releases/latest/download/VHSify-macos.tar.gz) | `vhsify.sh`, README, LICENSE |
+| 🪟 Windows | [**VHSify-windows.zip**](https://github.com/Evilchuck666/VHSify/releases/latest/download/VHSify-windows.zip) | `vhsify.ps1`, README, LICENSE |
+| 🔐 Checksums | [SHA256SUMS.txt](https://github.com/Evilchuck666/VHSify/releases/latest/download/SHA256SUMS.txt) | SHA‑256 of the packages above |
 
-**GNU/Linux / macOS:**
+These links always point to the [latest release](https://github.com/Evilchuck666/VHSify/releases/latest). Older versions are on the [releases page](https://github.com/Evilchuck666/VHSify/releases).
+
+Or install it from the terminal:
+
+**🐧 GNU/Linux**
 ```sh
-tar -xzf VHSify-linux.tar.gz          # or VHSify-macos.tar.gz
+curl -fsSL https://github.com/Evilchuck666/VHSify/releases/latest/download/VHSify-linux.tar.gz | tar -xz
 cd VHSify-linux
 ./vhsify.sh --help
 
-# Optional: make it available everywhere
+# Optional: make it available everywhere as "vhsify"
 sudo install -m 755 vhsify.sh /usr/local/bin/vhsify
 ```
 
-> **macOS:** if Gatekeeper complains about a downloaded file, run `xattr -d com.apple.quarantine vhsify.sh`.
+**🍎 macOS**
+```sh
+curl -fsSL https://github.com/Evilchuck666/VHSify/releases/latest/download/VHSify-macos.tar.gz | tar -xz
+cd VHSify-macos
+./vhsify.sh --help
 
-**Windows:** extract the zip, open PowerShell in that folder and run `.\vhsify.ps1`. If scripts are blocked, run `Unblock-File .\vhsify.ps1` or allow local scripts with `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+# Optional: make it available everywhere as "vhsify"
+sudo install -m 755 vhsify.sh /usr/local/bin/vhsify
+```
 
-Or just clone the repository and run the script from it.
+> If you downloaded the package with a browser and Gatekeeper complains, run `xattr -d com.apple.quarantine vhsify.sh`.
+
+**🪟 Windows (PowerShell)**
+```powershell
+Invoke-WebRequest https://github.com/Evilchuck666/VHSify/releases/latest/download/VHSify-windows.zip -OutFile VHSify-windows.zip
+Expand-Archive VHSify-windows.zip -DestinationPath . -Force
+cd VHSify-windows
+Unblock-File .\vhsify.ps1
+.\vhsify.ps1 -Version
+```
+
+> If scripts are still blocked, allow local scripts with `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+
+**🔐 Verify the download (optional)**
+```sh
+curl -fsSLO https://github.com/Evilchuck666/VHSify/releases/latest/download/SHA256SUMS.txt
+sha256sum -c --ignore-missing SHA256SUMS.txt        # GNU/Linux
+shasum -a 256 -c --ignore-missing SHA256SUMS.txt    # macOS
+```
+```powershell
+(Get-FileHash VHSify-windows.zip -Algorithm SHA256).Hash   # compare with SHA256SUMS.txt
+```
+
+You can also clone the repository and run the scripts from it.
 
 ---
 
