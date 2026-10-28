@@ -1,6 +1,8 @@
 # 📼 VHSify
 
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20GNU%2FLinux%20%7C%20macOS-blue)
+![Bash](https://img.shields.io/badge/Bash-%3E%3D3.2-blue)
+![PowerShell](https://img.shields.io/badge/PowerShell-%3E%3D5.1-blue)
 ![Requires](https://img.shields.io/badge/requires-FFmpeg%2C%20SoX-blue)
 [![License](https://img.shields.io/badge/license-GPLv3-green)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/Evilchuck666/VHSify?label=download&sort=semver)](https://github.com/Evilchuck666/VHSify/releases/latest)
