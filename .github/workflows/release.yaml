@@ -12,6 +12,7 @@ on:
       - 'vhsify.sh'
       - 'vhsify.ps1'
       - 'README.md'
+      - 'TECHNICAL_GUIDE.md'
       - 'LICENSE'
       - '.github/workflows/release.yaml'
   pull_request:
@@ -205,13 +206,13 @@ jobs:
             dir="stage/VHSify-$platform"
             mkdir -p "$dir"
             install -m 755 vhsify.sh "$dir/vhsify.sh"
-            install -m 644 README.md LICENSE "$dir/"
+            install -m 644 README.md TECHNICAL_GUIDE.md LICENSE "$dir/"
             tar -C stage -czf "release-assets/VHSify-$platform.tar.gz" "VHSify-$platform"
           done
 
           dir="stage/VHSify-windows"
           mkdir -p "$dir"
-          cp vhsify.ps1 README.md LICENSE "$dir/"
+          cp vhsify.ps1 README.md TECHNICAL_GUIDE.md LICENSE "$dir/"
           (cd stage && zip -qr "../release-assets/VHSify-windows.zip" VHSify-windows)
 
       - name: Check packages and generate checksums
