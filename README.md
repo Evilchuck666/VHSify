@@ -20,6 +20,28 @@ Runs on **GNU/Linux**, **macOS** and **Windows**.
 
 ---
 
+<!-- SCREENSHOTS:START -->
+## Screenshots
+
+![VHSify — video-frame](site/assets/screenshots/vhs-result.png)
+
+Frame extracted from VHSify's actual output, using an FFmpeg-generated test pattern as the input.
+
+<details>
+<summary>More screenshots</summary>
+
+![VHSify — video-frame](site/assets/screenshots/original.png)
+
+The original generated test pattern, at the same one-second position, before VHS processing.
+
+![VHSify — recorded-output](site/assets/screenshots/processing.png)
+
+VHSify's actual processing-step report for the sample video, rendered from its recorded output.
+
+</details>
+
+<!-- SCREENSHOTS:END -->
+
 ## ✨ Features
 - VHS‑style **video**: YUV plane separation, heavy down/upscales for chroma bleed, desaturation, grain, and subtle horizontal jitter.
 - VHS‑style **audio**: original audio mixed with **brown noise** and a **4 kHz low‑pass** to mimic tape bandwidth.
