@@ -6,7 +6,7 @@
 ![Requires](https://img.shields.io/badge/requires-FFmpeg%2C%20SoX-blue)
 [![License](https://img.shields.io/badge/license-GPLv3-green)](LICENSE)
 [![Latest release](https://img.shields.io/github/v/release/Evilchuck666/VHSify?label=download&sort=semver)](https://github.com/Evilchuck666/VHSify/releases/latest)
-[![Build and tests](https://github.com/Evilchuck666/VHSify/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/Evilchuck666/VHSify/actions/workflows/release.yml)
+[![Build and tests](https://github.com/Evilchuck666/VHSify/actions/workflows/release.yaml/badge.svg?branch=main)](https://github.com/Evilchuck666/VHSify/actions/workflows/release.yaml)
 
 **Turn any video into a worn-out VHS tape**: chroma bleed, soft luma, film grain, tracking jitter and tape hiss. It's a small script that runs **FFmpeg** for the picture and **SoX** for the sound, then muxes both into a lossless AVI (UTVideo + PCM float) that you can transcode however you like.
 
@@ -289,7 +289,7 @@ ffmpeg -i "clip_vhs.avi" -c copy "clip_vhs.mkv"
 ---
 
 ## 🏗️ Releases (for maintainers)
-The [Test and release](.github/workflows/release.yml) workflow runs both scripts on generated clips on **Ubuntu**, **macOS** (including the stock bash 3.2) and **Windows** (PowerShell 7 and 5.1) on every push and pull request.
+The [Test and release](.github/workflows/release.yaml) workflow runs both scripts on generated clips on **Ubuntu**, **macOS** (including the stock bash 3.2) and **Windows** (PowerShell 7 and 5.1) on every push and pull request.
 
 To publish a release:
 1. Bump `VERSION` in `vhsify.sh` and `$script:VhsifyVersion` in `vhsify.ps1`, then push to `main`.
