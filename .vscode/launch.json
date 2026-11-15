@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Needs the PowerShell extension, and pwsh on GNU/Linux and macOS. The extension evaluates the arguments
+      // as PowerShell, so the path goes in single quotes to survive spaces; the script strips double quotes from
+      // a pasted path. A temporary console gives each run a clean session, since the script sets $global:
+      // variables and calls exit when something fails.
+      "name": "VHSify: debug vhsify.ps1",
+      "type": "PowerShell",
+      "request": "launch",
+      "script": "${workspaceFolder}/vhsify.ps1",
+      "args": ["-InputPath", "'${input:video}'"],
+      "cwd": "${workspaceFolder}",
+      "createTemporaryIntegratedConsole": true
+    }
+  ],
+  "inputs": [
+    {
+      "id": "video",
+      "type": "promptString",
+      "description": "Video to process (the result is written next to it as <name>_vhs.avi)"
+    }
+  ]
+}

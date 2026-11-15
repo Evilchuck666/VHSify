@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    // vhsify.sh: lints while editing with the same checks as the CI "Lint" step
+    "timonwong.shellcheck",
+    // vhsify.ps1: editing, the OTBS formatting set in VHSify.code-workspace and the debugger in launch.json
+    "ms-vscode.powershell",
+    // .github/workflows/pages.yaml and release.yaml
+    "github.vscode-github-actions"
+  ]
+}

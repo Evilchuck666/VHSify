@@ -1,96 +1,41 @@
 {
+  // Open the project through this file. Each piece of configuration is defined in one place only:
+  //   - here: the folder and every setting;
+  //   - .vscode/extensions.json, .vscode/tasks.json, .vscode/launch.json: recommendations, tasks and debugging.
+  // Keep "extensions", "tasks" and "launch" out of this file and don't add a .vscode/settings.json: folder
+  // settings override workspace settings, so the same key would end up with two competing values.
   "folders": [
     {
       "name": "VHSify",
       "path": "."
     }
   ],
-  // vhsify.sh (Bash 3.2+) and vhsify.ps1 (PowerShell 5.1+) are equivalent: a change to one usually belongs in the other,
-  // VERSION / $script:VhsifyVersion included. Both need FFmpeg, FFprobe and SoX in PATH.
-  "settings": {},
-  "extensions": {
-    "recommendations": [
-      "timonwong.shellcheck",
-      "ms-vscode.powershell",
-      "github.vscode-github-actions"
-    ]
-  },
-  "launch": {
-    "version": "0.2.0",
-    "configurations": [
-      {
-        // Needs PowerShell (pwsh) and the PowerShell extension.
-        "name": "VHSify: debug vhsify.ps1",
-        "type": "PowerShell",
-        "request": "launch",
-        "script": "${workspaceFolder:VHSify}/vhsify.ps1",
-        "args": ["-InputPath", "${input:video}"],
-        "cwd": "${workspaceFolder:VHSify}"
-      }
-    ],
-    "inputs": [
-      {
-        "id": "video",
-        "type": "promptString",
-        "description": "Video to process (the result is written next to it)"
-      }
-    ]
-  },
-  "tasks": {
-    "version": "2.0.0",
-    "tasks": [
-      {
-        // Same lint as CI. The ShellCheck extension already lints while editing; this needs the shellcheck binary.
-        "label": "VHSify: shellcheck",
-        "type": "process",
-        "command": "shellcheck",
-        "args": ["vhsify.sh"],
-        "options": {
-          "cwd": "${workspaceFolder:VHSify}"
-        },
-        "problemMatcher": []
-      },
-      {
-        // The CI test for vhsify.sh in a temporary folder: generates a mono 44.1 kHz clip and a silent one, runs the
-        // script on a single file and on a JSON list, then checks for 1080p UTVideo and 48 kHz stereo PCM streams.
-        "label": "VHSify: test (generated clips)",
-        "type": "process",
-        "command": "bash",
-        "args": [
-          "-c",
-          "set -euo pipefail\nwork=$(mktemp -d)\ntrap 'rm -rf \"$work\"' EXIT\nmkdir -p \"$work/in dir\"\nffmpeg -v error -y -f lavfi -i testsrc2=size=640x360:rate=25:duration=2 -f lavfi -i sine=frequency=440:sample_rate=44100:duration=2 -ac 1 -c:v mpeg4 -c:a aac \"$work/in dir/clip one.mp4\"\nffmpeg -v error -y -f lavfi -i testsrc2=size=320x240:rate=30:duration=1 -c:v mpeg4 \"$work/in dir/silent.mp4\"\n./vhsify.sh \"$work/in dir/clip one.mp4\"\nprintf '[\\n  \"%s\",\\n  \"%s\"\\n]\\n' \"$work/in dir/clip one.mp4\" \"$work/in dir/silent.mp4\" > \"$work/list.json\"\n./vhsify.sh --list \"$work/list.json\" --output-dir \"$work/out\"\nfor file in \"$work/in dir/clip one_vhs.avi\" \"$work/out/clip one_vhs.avi\" \"$work/out/silent_vhs.avi\"; do\n  [[ -s \"$file\" ]] || { echo \"Missing output $file\"; exit 1; }\n  streams=$(ffprobe -v error -show_entries stream=codec_name,width,height,sample_rate,channels -of csv=p=0 \"$file\" | sed 's/,*$//')\n  echo \"${file##*/} -> $(echo \"$streams\" | paste -sd ' ' -)\"\n  grep -qx 'utvideo,1920,1080' <<< \"$streams\" || { echo \"No 1080p UTVideo stream in $file\"; exit 1; }\n  grep -qx 'pcm_f32le,48000,2' <<< \"$streams\" || { echo \"No 48 kHz stereo PCM stream in $file\"; exit 1; }\ndone\necho 'VHSify test OK'"
-        ],
-        "options": {
-          "cwd": "${workspaceFolder:VHSify}"
-        },
-        "group": {
-          "kind": "test",
-          "isDefault": true
-        },
-        "problemMatcher": []
-      },
-      {
-        // vhsify.sh on GNU/Linux and macOS, vhsify.ps1 on Windows. The result is written next to the video.
-        "label": "VHSify: process a video",
-        "type": "process",
-        "command": "bash",
-        "args": ["./vhsify.sh", "${input:video}"],
-        "windows": {
-          "command": "powershell",
-          "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ".\\vhsify.ps1", "-InputPath", "${input:video}"]
-        },
-        "options": {
-          "cwd": "${workspaceFolder:VHSify}"
-        },
-        "problemMatcher": []
-      }
-    ],
-    "inputs": [
-      {
-        "id": "video",
-        "type": "promptString",
-        "description": "Video to process (the result is written next to it)"
-      }
-    ]
+  "settings": {
+    // Repository conventions: LF line endings (a CRLF vhsify.sh breaks bash), one final newline, no trailing
+    // whitespace, and spaces for indentation: 4 in vhsify.sh and vhsify.ps1, 2 in the workflows, JSON and site/.
+    "files.eol": "\n",
+    "files.insertFinalNewline": true,
+    "files.trimFinalNewlines": true,
+    "files.trimTrailingWhitespace": true,
+    "editor.insertSpaces": true,
+    "editor.tabSize": 4,
+    "[yaml]": {
+      "editor.tabSize": 2
+    },
+    "[json]": {
+      "editor.tabSize": 2
+    },
+    "[jsonc]": {
+      "editor.tabSize": 2
+    },
+    "[html]": {
+      "editor.tabSize": 2
+    },
+    "[css]": {
+      "editor.tabSize": 2
+    },
+
+    // vhsify.ps1 keeps the closing brace and the next keyword on one line ("} else {", "} finally {").
+    "powershell.codeFormatting.preset": "OTBS"
   }
 }

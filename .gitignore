@@ -1,0 +1,24 @@
+# Videos used to try the scripts by hand and what ends up next to them: the <name>_vhs.avi results and the
+# transcodes and remuxes from TECHNICAL_GUIDE.md (*_vhs.mp4, *_vhs_hevc.mp4, *_vhs.mkv). The scripts keep their
+# intermediate files in a private temporary folder outside the repository.
+*.avi
+*.mkv
+*.mov
+*.mp4
+*.m4v
+*.mpg
+*.webm
+
+# Working files of .github/workflows/release.yaml when its steps run locally: the generated test clips and their
+# outputs (work/), the package staging and archives (stage/, release-assets/) and the tag list (tags.txt).
+# The "VHSify: test" task in .vscode/tasks.json uses a temporary folder instead.
+/work/
+/stage/
+/release-assets/
+/tags.txt
+
+# OS metadata on the three supported platforms. It also keeps strays out of site/: pages.yaml expects exactly
+# six files there.
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,54 @@
+{
+  // vhsify.sh (Bash 3.2+) and vhsify.ps1 (PowerShell 5.1+) are equivalent: a change to one usually belongs in the
+  // other, VERSION and $script:VhsifyVersion included. Both need FFmpeg, FFprobe and SoX in PATH.
+  // Tasks run from the project root, like the commands in .github/workflows/release.yaml.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      // The ShellCheck extension already reports problems while editing, so this task adds no problem matcher.
+      "label": "VHSify: shellcheck",
+      "detail": "Same lint as CI (needs the shellcheck binary)",
+      "type": "process",
+      "command": "shellcheck",
+      "args": ["vhsify.sh"],
+      "problemMatcher": []
+    },
+    {
+      // The CI test for vhsify.sh, run in a temporary folder that is always removed: generates a mono 44.1 kHz clip
+      // and a silent one, runs the script on a single file and on a JSON list (needs jq or python3), then checks
+      // each output for a 1080p UTVideo stream and a 48 kHz stereo PCM float stream.
+      "label": "VHSify: test (generated clips)",
+      "detail": "vhsify.sh on generated clips, as in release.yaml",
+      "type": "process",
+      "command": "bash",
+      "args": [
+        "-c",
+        "set -euo pipefail\nwork=$(mktemp -d)\ntrap 'rm -rf \"$work\"' EXIT\nmkdir -p \"$work/in dir\"\nffmpeg -v error -y -f lavfi -i testsrc2=size=640x360:rate=25:duration=2 -f lavfi -i sine=frequency=440:sample_rate=44100:duration=2 -ac 1 -c:v mpeg4 -c:a aac \"$work/in dir/clip one.mp4\"\nffmpeg -v error -y -f lavfi -i testsrc2=size=320x240:rate=30:duration=1 -c:v mpeg4 \"$work/in dir/silent.mp4\"\n./vhsify.sh \"$work/in dir/clip one.mp4\"\nprintf '[\\n  \"%s\",\\n  \"%s\"\\n]\\n' \"$work/in dir/clip one.mp4\" \"$work/in dir/silent.mp4\" > \"$work/list.json\"\n./vhsify.sh --list \"$work/list.json\" --output-dir \"$work/out\"\nfor file in \"$work/in dir/clip one_vhs.avi\" \"$work/out/clip one_vhs.avi\" \"$work/out/silent_vhs.avi\"; do\n  [[ -s \"$file\" ]] || { echo \"Missing output $file\"; exit 1; }\n  streams=$(ffprobe -v error -show_entries stream=codec_name,width,height,sample_rate,channels -of csv=p=0 \"$file\" | sed 's/,*$//')\n  echo \"${file##*/} -> $(echo \"$streams\" | paste -sd ' ' -)\"\n  grep -qx 'utvideo,1920,1080' <<< \"$streams\" || { echo \"No 1080p UTVideo stream in $file\"; exit 1; }\n  grep -qx 'pcm_f32le,48000,2' <<< \"$streams\" || { echo \"No 48 kHz stereo PCM stream in $file\"; exit 1; }\ndone\necho 'VHSify test OK'"
+      ],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "VHSify: process a video",
+      "detail": "vhsify.sh on GNU/Linux and macOS, vhsify.ps1 on Windows",
+      "type": "process",
+      "command": "bash",
+      "args": ["./vhsify.sh", "${input:video}"],
+      "windows": {
+        "command": "powershell",
+        "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", ".\\vhsify.ps1", "-InputPath", "${input:video}"]
+      },
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "video",
+      "type": "promptString",
+      "description": "Video to process (the result is written next to it as <name>_vhs.avi)"
+    }
+  ]
+}
