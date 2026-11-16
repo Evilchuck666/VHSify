@@ -6,6 +6,10 @@ on:
     paths:
       - 'site/**'
       - '.github/workflows/pages.yaml'
+  pull_request:
+    paths:
+      - 'site/**'
+      - '.github/workflows/pages.yaml'
   workflow_dispatch:
 
 permissions:
@@ -15,12 +19,33 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 concurrency:
-  group: project-pages
-  cancel-in-progress: false
+  group: project-pages-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  validate:
+    name: Validate project page
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Check public files
+        shell: bash
+        run: |
+          test -s site/index.html
+          test -s site/styles.css
+          test -f site/.nojekyll
+          test "$(find site -type f | wc -l)" -eq 7
+          test -s site/favicon.svg
+          test -s site/assets/screenshots/vhs-result.png
+          test -s site/assets/screenshots/original.png
+          test -s site/assets/screenshots/processing.png
+
   deploy:
-    if: github.ref == 'refs/heads/main'
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -34,16 +59,6 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Check public files
-        run: |
-          test -s site/index.html
-          test -s site/styles.css
-          test -f site/.nojekyll
-          test "$(find site -type f | wc -l)" -eq 7
-          test -s site/favicon.svg
-          test -s site/assets/screenshots/vhs-result.png
-          test -s site/assets/screenshots/original.png
-          test -s site/assets/screenshots/processing.png
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v5
         with:

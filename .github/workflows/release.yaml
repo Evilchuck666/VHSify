@@ -8,13 +8,6 @@ name: Test and release
 on:
   push:
     branches: [main]
-    paths:
-      - 'vhsify.sh'
-      - 'vhsify.ps1'
-      - 'README.md'
-      - 'TECHNICAL_GUIDE.md'
-      - 'LICENSE'
-      - '.github/workflows/release.yaml'
   pull_request:
   workflow_dispatch:
     inputs:
@@ -36,7 +29,98 @@ concurrency:
   cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 jobs:
+  # Keep the workflow visible to required checks; only relevant jobs run.
+  changes:
+    name: Detect relevant changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      checks: ${{ steps.filter.outputs.checks }}
+      metadata: ${{ steps.filter.outputs.metadata }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Classify changed files
+        id: filter
+        shell: python
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CHANGE_FILTERS: |
+            {
+              "checks": {
+                "include": [
+                  "vhsify.sh",
+                  "vhsify.ps1",
+                  ".github/workflows/release.yaml"
+                ],
+                "exclude": []
+              },
+              "metadata": {
+                "include": [
+                  "README.md",
+                  "TECHNICAL_GUIDE.md",
+                  "LICENSE"
+                ],
+                "exclude": []
+              }
+            }
+        run: |
+          import fnmatch
+          import json
+          import os
+          import re
+          import subprocess
+
+          def git(*args):
+              return subprocess.check_output(['git', *args])
+
+          filters = json.loads(os.environ['CHANGE_FILTERS'])
+          event = json.loads(open(os.environ['GITHUB_EVENT_PATH']).read())
+          event_name = os.environ['EVENT_NAME']
+          force = event_name in ('workflow_dispatch', 'schedule')
+          paths = []
+          if not force:
+              if event_name == 'pull_request':
+                  base = event['pull_request']['base']['sha']
+                  head = event['pull_request']['head']['sha']
+              else:
+                  base, head = event['before'], event['after']
+              if not all(re.fullmatch(r'[0-9a-fA-F]{40,64}', sha) for sha in (base, head)):
+                  raise SystemExit('Invalid Git object ID in event')
+              available = base.strip('0') and subprocess.run(
+                  ['git', 'cat-file', '-e', base + '^{commit}'],
+                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+              ).returncode == 0
+              if not available:
+                  # Initial/force pushes can omit the old commit. Validate everything safely.
+                  force = True
+              else:
+                  if event_name == 'pull_request':
+                      base = git('merge-base', base, head).decode().strip()
+                  paths = git('diff', '--no-renames', '--name-only', '-z', base, head).decode().split('\0')
+                  paths = [path for path in paths if path]
+
+          def matches(path, patterns):
+              # fnmatch's * includes /; a leading **/ also matches root-level files.
+              return any(fnmatch.fnmatchcase(path, pattern) or (
+                  pattern.startswith('**/') and fnmatch.fnmatchcase(path, pattern[3:])
+              ) for pattern in patterns)
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              for name, patterns in filters.items():
+                  selected = force or any(
+                      matches(path, patterns['include']) and not matches(path, patterns.get('exclude', []))
+                      for path in paths
+                  )
+                  value = str(selected).lower()
+                  print(f'{name}={value}', file=output)
+                  print(f'{name}: {value}')
+
   test:
+    needs: [changes]
+    if: needs.changes.outputs.checks == 'true'
     name: Test (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -237,3 +321,60 @@ jobs:
             --title "VHSify v$VERSION" \
             --generate-notes \
             --latest
+
+  metadata:
+    name: Check distributable archives
+    needs: [changes]
+    if: needs.changes.outputs.metadata == 'true' && needs.changes.outputs.checks != 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Package scripts and documentation without processing video
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+
+          for platform in linux macos; do
+            dir="stage/VHSify-$platform"
+            mkdir -p "$dir"
+            install -m 755 vhsify.sh "$dir/vhsify.sh"
+            install -m 644 README.md TECHNICAL_GUIDE.md LICENSE "$dir/"
+            tar -C stage -czf "release-assets/VHSify-$platform.tar.gz" "VHSify-$platform"
+          done
+
+          dir="stage/VHSify-windows"
+          mkdir -p "$dir"
+          cp vhsify.ps1 README.md TECHNICAL_GUIDE.md LICENSE "$dir/"
+          (cd stage && zip -qr "../release-assets/VHSify-windows.zip" VHSify-windows)
+      - name: Verify archive contents
+        run: |
+          tar -tzf release-assets/VHSify-linux.tar.gz
+          tar -tzf release-assets/VHSify-macos.tar.gz
+          unzip -t release-assets/VHSify-windows.zip
+
+  result:
+    name: CI result
+    if: always()
+    needs: [changes, test, release, metadata]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify required jobs
+        shell: python
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          import json
+          import os
+
+          results = json.loads(os.environ['RESULTS'])
+          failed = [name for name, job in results.items() if job['result'] in ('failure', 'cancelled')]
+          if results['changes']['result'] != 'success':
+              failed.append('changes')
+          if failed:
+              raise SystemExit('Unsuccessful jobs: ' + ', '.join(sorted(set(failed))))
+          print('All relevant jobs passed; unrelated jobs were skipped.')
